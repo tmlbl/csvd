@@ -9,3 +9,4 @@ via HTTP verbs on virtual CSV files called
 * range queries
 * table metadata
 * documentation
+* batch inserts
