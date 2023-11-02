@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/dgraph-io/badger/v4"
 )
@@ -161,4 +162,80 @@ func (s *Store) ScanRows(table string) (*RowIter, error) {
 	}
 
 	return &ri, nil
+}
+
+func tagKey(tag, table string) []byte {
+	return []byte(fmt.Sprintf("tag:%s:%s", tag, table))
+}
+
+func (s *Store) TagTable(table, tag string) error {
+	key := tagKey(tag, table)
+	return s.db.Update(func(txn *badger.Txn) error {
+		return txn.Set(key, []byte(table))
+	})
+}
+
+func (s *Store) ListTableDefsByTag(tag string) ([]TableDef, error) {
+	defs := []TableDef{}
+	err := s.db.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		prefix := tagKey(tag, "")
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			err := item.Value(func(val []byte) error {
+				def, err := s.ReadTableDef(string(val))
+				if err != nil {
+					return err
+				}
+				defs = append(defs, *def)
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return defs, nil
+}
+
+type TagInfo struct {
+	Name      string
+	NumTables int
+}
+
+func (s *Store) GetTagInfo() ([]TagInfo, error) {
+	m := map[string]int{}
+	err := s.db.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		prefix := []byte("tag:")
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			parts := strings.Split(string(item.Key()), ":")
+			tagName := parts[1]
+
+			if _, ok := m[tagName]; !ok {
+				m[tagName] = 1
+			} else {
+				m[tagName] += 1
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	infos := []TagInfo{}
+	for k, v := range m {
+		infos = append(infos, TagInfo{
+			Name:      k,
+			NumTables: v,
+		})
+	}
+	return infos, nil
 }

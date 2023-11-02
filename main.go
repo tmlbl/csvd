@@ -21,6 +21,9 @@ func main() {
 	r.Post("/tables/{name}", csvd.handlePostData)
 	r.Get("/tables/{name}", csvd.handleReadRows)
 
+	r.Post("/tables/{table}/tags/{tag}", csvd.handleTagTable)
+	r.Get("/tags", csvd.handleListTags)
+
 	http.ListenAndServe(":3737", r)
 }
 
@@ -109,7 +112,15 @@ func (c *CSVD) handleReadRows(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *CSVD) handleListTables(w http.ResponseWriter, r *http.Request) {
-	defs, err := c.store.ListTableDefs()
+	var defs []TableDef
+	var err error
+
+	tag := r.URL.Query().Get("tag")
+	if tag != "" {
+		defs, err = c.store.ListTableDefsByTag(tag)
+	} else {
+		defs, err = c.store.ListTableDefs()
+	}
 	if err != nil {
 		w.WriteHeader(500)
 		w.Write([]byte(
@@ -122,5 +133,37 @@ func (c *CSVD) handleListTables(w http.ResponseWriter, r *http.Request) {
 
 	for _, d := range defs {
 		w.Write([]byte(fmt.Sprintf("%s,%s\n", d.Name, d.Columns)))
+	}
+}
+
+func (c *CSVD) handleTagTable(w http.ResponseWriter, r *http.Request) {
+	table := chi.URLParam(r, "table")
+	tag := chi.URLParam(r, "tag")
+
+	err := c.store.TagTable(table, tag)
+	if err != nil {
+		w.WriteHeader(500)
+		w.Write([]byte(
+			fmt.Sprintf("tagging table: %s", err),
+		))
+		return
+	}
+}
+
+func (c *CSVD) handleListTags(w http.ResponseWriter, r *http.Request) {
+	infos, err := c.store.GetTagInfo()
+	if err != nil {
+		w.WriteHeader(500)
+		w.Write([]byte(
+			fmt.Sprintf("tagging table: %s", err),
+		))
+		return
+	}
+	w.Header().Add("Content-Type", "text/csv")
+	w.Write([]byte("name,n_tables\n"))
+
+	for _, info := range infos {
+		data := fmt.Sprintf("%s,%d\n", info.Name, info.NumTables)
+		w.Write([]byte(data))
 	}
 }

@@ -86,3 +86,30 @@ func TestScanRows(t *testing.T) {
 		i++
 	}
 }
+
+func TestTagTables(t *testing.T) {
+	is := is.New(t)
+
+	def := TableDef{
+		Name:    "test1",
+		Columns: []string{"foo", "bar"},
+	}
+
+	def2 := TableDef{
+		Name:    "test2",
+		Columns: []string{"bing", "bong"},
+	}
+
+	dir := t.TempDir()
+	store, err := NewStore(dir)
+	is.NoErr(err)
+
+	is.NoErr(store.WriteTableDef(&def))
+	is.NoErr(store.WriteTableDef(&def2))
+
+	is.NoErr(store.TagTable(def.Name, "foo"))
+	list, err := store.ListTableDefsByTag("foo")
+	is.NoErr(err)
+	is.Equal(len(list), 1)
+	is.Equal(list[0].Name, def.Name)
+}
