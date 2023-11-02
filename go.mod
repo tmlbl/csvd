@@ -1,4 +1,4 @@
-module github.com/tmlbl/gcsv
+module github.com/tmlbl/csvd
 
 go 1.21.1
 
