@@ -59,6 +59,14 @@ func (c *CSVD) handlePostData(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("no columns in header row"))
 			return
 		}
+		// cannot contain | in column name
+		for _, c := range columns {
+			if strings.Contains(c, "|") {
+				w.WriteHeader(400)
+				w.Write([]byte("column name cannot contain |"))
+				return
+			}
+		}
 		def = &TableDef{
 			Name:    name,
 			Columns: columns,
@@ -132,7 +140,8 @@ func (c *CSVD) handleListTables(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("name,columns\n"))
 
 	for _, d := range defs {
-		w.Write([]byte(fmt.Sprintf("%s,%s\n", d.Name, d.Columns)))
+		columns := strings.Join(d.Columns, "|")
+		w.Write([]byte(fmt.Sprintf("%s,%s\n", d.Name, columns)))
 	}
 }
 
