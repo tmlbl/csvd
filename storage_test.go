@@ -85,6 +85,11 @@ func TestScanRows(t *testing.T) {
 		is.Equal(string(it.Value()), rows[i])
 		i++
 	}
+
+	is.NoErr(store.DeleteTable(def.Name))
+	it, err = store.ScanRows(def.Name)
+	is.NoErr(err)
+	is.Equal(it.Next(), false)
 }
 
 func TestTagTables(t *testing.T) {

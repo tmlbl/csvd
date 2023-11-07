@@ -164,6 +164,23 @@ func (s *Store) ScanRows(table string) (*RowIter, error) {
 	return &ri, nil
 }
 
+func (s *Store) DeleteTable(table string) error {
+	return s.db.Update(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		prefix := rowKey(table, "")
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			err := txn.Delete(it.Item().Key())
+			if err != nil {
+				return err
+			}
+		}
+
+		tdkey := tableDefKey(table)
+		return txn.Delete(tdkey)
+	})
+}
+
 func tagKey(tag, table string) []byte {
 	return []byte(fmt.Sprintf("tag:%s:%s", tag, table))
 }

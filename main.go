@@ -20,6 +20,7 @@ func main() {
 	r.Get("/tables", csvd.handleListTables)
 	r.Post("/tables/{name}", csvd.handlePostData)
 	r.Get("/tables/{name}", csvd.handleReadRows)
+	r.Delete("/tables/{name}", csvd.handleDeleteData)
 
 	r.Post("/tables/{table}/tags/{tag}", csvd.handleTagTable)
 	r.Get("/tags", csvd.handleListTags)
@@ -174,5 +175,24 @@ func (c *CSVD) handleListTags(w http.ResponseWriter, r *http.Request) {
 	for _, info := range infos {
 		data := fmt.Sprintf("%s,%d\n", info.Name, info.NumTables)
 		w.Write([]byte(data))
+	}
+}
+
+func (c *CSVD) handleDeleteData(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	s := bufio.NewScanner(r.Body)
+	if !s.Scan() {
+		// if there is no data, delete the whole table
+		err := c.store.DeleteTable(name)
+		if err != nil {
+			w.WriteHeader(500)
+			w.Write([]byte(
+				fmt.Sprintf("deleting table: %s", err),
+			))
+			return
+		}
+		w.Write([]byte("table deleted"))
+		return
 	}
 }
