@@ -118,3 +118,23 @@ func TestTagTables(t *testing.T) {
 	is.Equal(len(list), 1)
 	is.Equal(list[0].Name, def.Name)
 }
+
+func TestDeleteTable(t *testing.T) {
+	is := is.New(t)
+
+	def := TableDef{
+		Name:    "test1",
+		Columns: []string{"foo", "bar"},
+	}
+
+	dir := t.TempDir()
+	store, err := NewStore(dir)
+	is.NoErr(err)
+
+	is.NoErr(store.WriteTableDef(&def))
+	is.NoErr(store.TagTable(def.Name, "foo"))
+	is.NoErr(store.DeleteTable(def.Name))
+	list, err := store.ListTableDefsByTag("foo")
+	is.NoErr(err)
+	is.Equal(len(list), 0)
+}

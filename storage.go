@@ -213,6 +213,16 @@ func (s *Store) DeleteTable(table string) error {
 
 func (s *Store) deleteTableDef(table string) error {
 	return s.db.Update(func(txn *badger.Txn) error {
+		tags, err := s.GetTagInfo()
+		if err != nil {
+			return err
+		}
+		for _, t := range tags {
+			err = txn.Delete(tagKey(t.Name, table))
+			if err != nil {
+				return err
+			}
+		}
 		return txn.Delete(tableDefKey(table))
 	})
 }
