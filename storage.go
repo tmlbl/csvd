@@ -131,6 +131,9 @@ func (r *RowIter) Next() bool {
 }
 
 func (r *RowIter) Value() []byte {
+	if r.it.Item().IsDeletedOrExpired() {
+		return nil
+	}
 	var val []byte
 	item := r.it.Item()
 	err := item.Value(func(v []byte) error {
@@ -141,6 +144,11 @@ func (r *RowIter) Value() []byte {
 		panic(err)
 	}
 	return val
+}
+
+func (r *RowIter) Key() []byte {
+	key := make([]byte, r.it.Item().KeySize())
+	return r.it.Item().KeyCopy(key)
 }
 
 func (r *RowIter) Close() {
@@ -165,19 +173,47 @@ func (s *Store) ScanRows(table string) (*RowIter, error) {
 }
 
 func (s *Store) DeleteTable(table string) error {
-	return s.db.Update(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer it.Close()
-		prefix := rowKey(table, "")
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			err := txn.Delete(it.Item().Key())
+	it, err := s.ScanRows(table)
+	if err != nil {
+		return err
+	}
+
+	keysToDelete := [][]byte{}
+	for it.Next() {
+		keysToDelete = append(keysToDelete, it.Key())
+	}
+	it.Close()
+
+	txn := s.db.NewTransaction(true)
+	count := 0
+	for _, key := range keysToDelete {
+		if err := txn.Delete(key); err == badger.ErrTxnTooBig {
+			count = 0
+			err = txn.Commit()
 			if err != nil {
 				return err
 			}
+			txn.Discard()
+			txn = s.db.NewTransaction(true)
+			err = txn.Delete(key)
+			if err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
 		}
+		count++
+	}
+	err = txn.Commit()
+	if err != nil {
+		return err
+	}
+	return s.deleteTableDef(table)
+}
 
-		tdkey := tableDefKey(table)
-		return txn.Delete(tdkey)
+func (s *Store) deleteTableDef(table string) error {
+	return s.db.Update(func(txn *badger.Txn) error {
+		return txn.Delete(tableDefKey(table))
 	})
 }
 

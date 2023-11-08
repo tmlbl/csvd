@@ -115,8 +115,11 @@ func (c *CSVD) handleReadRows(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte{'\n'})
 
 	for it.Next() {
-		w.Write(it.Value())
-		w.Write([]byte{'\n'})
+		val := it.Value()
+		if val != nil {
+			w.Write(it.Value())
+			w.Write([]byte{'\n'})
+		}
 	}
 }
 
