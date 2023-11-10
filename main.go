@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,8 +12,11 @@ import (
 )
 
 func main() {
+	dir := flag.String("d", "/tmp/csvd", "database directory")
+	flag.Parse()
+
 	r := chi.NewRouter()
-	csvd, err := NewCSVD()
+	csvd, err := NewCSVD(*dir)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -32,8 +36,9 @@ type CSVD struct {
 	store *Store
 }
 
-func NewCSVD() (*CSVD, error) {
-	store, err := NewStore("/tmp/csvd")
+func NewCSVD(dir string) (*CSVD, error) {
+	log.Printf("opening data directory %s\n", dir)
+	store, err := NewStore(dir)
 	if err != nil {
 		return nil, err
 	}
