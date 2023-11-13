@@ -227,6 +227,12 @@ func (s *Store) deleteTableDef(table string) error {
 	})
 }
 
+func (s *Store) DeleteRow(table, pkey string) error {
+	return s.db.Update(func(txn *badger.Txn) error {
+		return txn.Delete(rowKey(table, pkey))
+	})
+}
+
 func tagKey(tag, table string) []byte {
 	return []byte(fmt.Sprintf("tag:%s:%s", tag, table))
 }

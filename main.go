@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"log"
@@ -15,11 +14,16 @@ func main() {
 	dir := flag.String("d", "/tmp/csvd", "database directory")
 	flag.Parse()
 
-	r := chi.NewRouter()
 	csvd, err := NewCSVD(*dir)
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	http.ListenAndServe(":3737", newRouter(csvd))
+}
+
+func newRouter(csvd *CSVD) *chi.Mux {
+	r := chi.NewRouter()
 
 	r.Get("/tables", csvd.handleListTables)
 	r.Post("/tables/{name}", csvd.handlePostData)
@@ -29,7 +33,7 @@ func main() {
 	r.Post("/tables/{table}/tags/{tag}", csvd.handleTagTable)
 	r.Get("/tags", csvd.handleListTags)
 
-	http.ListenAndServe(":3737", r)
+	return r
 }
 
 type CSVD struct {
@@ -44,59 +48,6 @@ func NewCSVD(dir string) (*CSVD, error) {
 	}
 
 	return &CSVD{store}, nil
-}
-
-func (c *CSVD) handlePostData(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "name")
-
-	s := bufio.NewScanner(r.Body)
-	if !s.Scan() {
-		w.WriteHeader(400)
-		w.Write([]byte("could not read header row"))
-		return
-	}
-
-	def, err := c.store.ReadTableDef(name)
-	if err != nil {
-		header := s.Bytes()
-		columns := strings.Split(string(header), ",")
-		if len(columns) < 1 {
-			w.WriteHeader(400)
-			w.Write([]byte("no columns in header row"))
-			return
-		}
-		// cannot contain | in column name
-		for _, c := range columns {
-			if strings.Contains(c, "|") {
-				w.WriteHeader(400)
-				w.Write([]byte("column name cannot contain |"))
-				return
-			}
-		}
-		def = &TableDef{
-			Name:    name,
-			Columns: columns,
-		}
-		err = c.store.WriteTableDef(def)
-		if err != nil {
-			w.WriteHeader(500)
-			w.Write([]byte(
-				fmt.Sprintf("writing table def: %s", err),
-			))
-			return
-		}
-	}
-
-	for s.Scan() {
-		err = c.store.WriteRow(name, s.Bytes())
-		if err != nil {
-			w.WriteHeader(500)
-			w.Write([]byte(
-				fmt.Sprintf("writing row: %s", err),
-			))
-			return
-		}
-	}
 }
 
 func (c *CSVD) handleReadRows(w http.ResponseWriter, r *http.Request) {
@@ -183,24 +134,5 @@ func (c *CSVD) handleListTags(w http.ResponseWriter, r *http.Request) {
 	for _, info := range infos {
 		data := fmt.Sprintf("%s,%d\n", info.Name, info.NumTables)
 		w.Write([]byte(data))
-	}
-}
-
-func (c *CSVD) handleDeleteData(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "name")
-
-	s := bufio.NewScanner(r.Body)
-	if !s.Scan() {
-		// if there is no data, delete the whole table
-		err := c.store.DeleteTable(name)
-		if err != nil {
-			w.WriteHeader(500)
-			w.Write([]byte(
-				fmt.Sprintf("deleting table: %s", err),
-			))
-			return
-		}
-		w.Write([]byte("table deleted"))
-		return
 	}
 }
