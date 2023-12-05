@@ -244,6 +244,13 @@ func (s *Store) TagTable(table, tag string) error {
 	})
 }
 
+func (s *Store) DeleteTag(table, tag string) error {
+	key := tagKey(tag, table)
+	return s.db.Update(func(txn *badger.Txn) error {
+		return txn.Delete(key)
+	})
+}
+
 func (s *Store) ListTableDefsByTag(tag string) ([]TableDef, error) {
 	defs := []TableDef{}
 	err := s.db.View(func(txn *badger.Txn) error {

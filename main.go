@@ -31,6 +31,7 @@ func newRouter(csvd *CSVD) *chi.Mux {
 	r.Delete("/tables/{name}", csvd.handleDeleteData)
 
 	r.Post("/tables/{table}/tags/{tag}", csvd.handleTagTable)
+	r.Delete("/tables/{table}/tags/{tag}", csvd.handleDeleteTag)
 	r.Get("/tags", csvd.handleListTags)
 
 	return r
@@ -114,6 +115,20 @@ func (c *CSVD) handleTagTable(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		w.Write([]byte(
 			fmt.Sprintf("tagging table: %s", err),
+		))
+		return
+	}
+}
+
+func (c *CSVD) handleDeleteTag(w http.ResponseWriter, r *http.Request) {
+	table := chi.URLParam(r, "table")
+	tag := chi.URLParam(r, "tag")
+
+	err := c.store.DeleteTag(table, tag)
+	if err != nil {
+		w.WriteHeader(500)
+		w.Write([]byte(
+			fmt.Sprintf("deleting tag: %s", err),
 		))
 		return
 	}
